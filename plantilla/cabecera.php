@@ -1,4 +1,4 @@
-<?php $titulo_pagina = $titulo_pagina ?? 'Cartelera'; ?>
+<?php $titulo_pagina = $titulo_pagina ?? 'Buscador'; ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -17,12 +17,13 @@
         <img class="marca-logo" src="assets/img/logo.svg" alt="" width="44" height="44">
         <span>
           <span class="marca-nombre">CINE<span class="marca-separado">sesitas</span>Verlas</span>
-          <span class="marca-lema">Sistema de funciones</span>
+          <span class="marca-lema">Buscador y cartelera personal</span>
         </span>
       </a>
       <nav class="menu">
-        <a class="menu-enlace" href="index.php">Cartelera</a>
-        <a class="menu-enlace" href="formulario.php">Registrar función</a>
+        <a class="menu-enlace" href="index.php">Buscador</a>
+        <a class="menu-enlace" href="index.php#cartelera">Mi cartelera</a>
+        <a class="boton boton-primario boton-chico" href="formulario.php">+ Película</a>
       </nav>
     </div>
   </header>

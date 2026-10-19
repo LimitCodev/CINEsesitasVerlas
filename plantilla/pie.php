@@ -1,10 +1,10 @@
   </main>
   <footer class="pie">
     <div class="contenedor pie-interno">
-      <p><strong>CINEsesitasVerlas</strong> · Gestión de funciones de cine</p>
-      <p class="pie-nota">Desarrollado con PHP, MySQL y JavaScript · Datos de películas: TVMaze API</p>
+      <p><strong>CINEsesitasVerlas</strong> · Buscador de películas con tráileres y cartelera personal</p>
+      <p class="pie-nota">Datos: Wikipedia y Wikidata (sin clave) · PHP + MySQL + JavaScript</p>
     </div>
   </footer>
-  <script src="assets/js/cartelera.js"></script>
+  <script src="assets/js/buscador.js"></script>
 </body>
 </html>
