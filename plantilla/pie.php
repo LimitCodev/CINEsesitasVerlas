@@ -5,5 +5,6 @@
       <p class="pie-nota">Desarrollado con PHP, MySQL y JavaScript · Datos de películas: TVMaze API</p>
     </div>
   </footer>
+  <script src="assets/js/cartelera.js"></script>
 </body>
 </html>

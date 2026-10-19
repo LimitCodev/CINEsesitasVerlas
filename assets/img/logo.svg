@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Logo CINEsesitasVerlas">
+  <defs>
+    <clipPath id="cinta-claqueta">
+      <rect x="7" y="9" width="50" height="15" rx="3"/>
+    </clipPath>
+  </defs>
+
+  <!-- Base de la claqueta -->
+  <rect x="7" y="26" width="50" height="29" rx="4" fill="#16131F" stroke="#FFB703" stroke-width="3"/>
+
+  <!-- Cinta superior con listones -->
+  <g clip-path="url(#cinta-claqueta)">
+    <rect x="7" y="9" width="50" height="15" fill="#FFB703"/>
+    <path d="M14 9 L24 24 H17 L7 9 Z" fill="#0D0B14"/>
+    <path d="M29 9 L39 24 H32 L22 9 Z" fill="#0D0B14"/>
+    <path d="M44 9 L54 24 H47 L37 9 Z" fill="#0D0B14"/>
+    <path d="M59 9 L69 24 H62 L52 9 Z" fill="#0D0B14"/>
+  </g>
+  <rect x="7" y="9" width="50" height="15" rx="3" fill="none" stroke="#FFB703" stroke-width="3"/>
+
+  <!-- Botón de reproducción -->
+  <path d="M27 34 L44 41 L27 48 Z" fill="#E63946"/>
+</svg>

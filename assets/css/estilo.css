@@ -294,6 +294,49 @@ main { flex: 1; padding: 28px 0 40px; }
   margin-top: 10px;
 }
 
+/* ---------- Importador Ajax (TVMaze) ---------- */
+.importador {
+  background: var(--superficie);
+  border: 1px dashed var(--ambar);
+  border-radius: var(--radio);
+  padding: 20px;
+  margin-bottom: 22px;
+}
+.importador h2 { font-size: 1.15rem; margin-bottom: 4px; }
+.importador .subtitulo { margin-bottom: 14px; }
+.importador-busqueda { display: flex; flex-wrap: wrap; gap: 10px; }
+.importador-busqueda input {
+  flex: 1;
+  min-width: 220px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  color: var(--texto);
+  padding: 11px 14px;
+  font-size: 0.97rem;
+}
+.importador-busqueda input:focus { outline: none; border-color: var(--ambar); }
+.importador-resultados { margin-top: 14px; }
+
+.lista-resultados { display: flex; flex-direction: column; gap: 8px; }
+.resultado-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.resultado-info { display: flex; flex-direction: column; gap: 2px; }
+.resultado-info span { font-size: 0.82rem; color: var(--texto-suave); }
+
+.mensaje-api { font-size: 0.9rem; color: var(--texto-suave); }
+.mensaje-aviso { color: var(--ambar-claro); }
+.mensaje-error { color: #ff9aa4; }
+.mensaje-exito { color: #7ff0b2; }
+
 /* ---------- Pie ---------- */
 .pie {
   background: var(--superficie);

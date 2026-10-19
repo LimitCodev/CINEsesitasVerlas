@@ -38,6 +38,18 @@ include 'plantilla/cabecera.php';
     <a class="boton boton-secundario" href="index.php">← Volver a la cartelera</a>
   </section>
 
+  <!-- Caso aplicativo de Ajax: importar datos de la película desde TVMaze
+       sin recargar la página -->
+  <section class="importador">
+    <h2>Importar datos desde TVMaze</h2>
+    <p class="subtitulo">Busca la película y toca «Usar datos» para completar el formulario automáticamente.</p>
+    <div class="importador-busqueda">
+      <input id="entrada-tvmaze" type="search" maxlength="80" placeholder="Ej. Duna, Oppenheimer, Coraline…">
+      <button class="boton boton-primario" id="btn-buscar-tvmaze" type="button">Buscar en TVMaze</button>
+    </div>
+    <div id="resultados-tvmaze" class="importador-resultados" aria-live="polite"></div>
+  </section>
+
   <?php if ($hayError): ?>
     <div class="aviso aviso-error">Faltan datos obligatorios: película, género, sala y horario.</div>
   <?php endif; ?>
