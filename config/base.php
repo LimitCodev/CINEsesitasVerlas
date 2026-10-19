@@ -29,29 +29,140 @@ function responder_json($datos)
     exit;
 }
 
-/** Consulta una URL externa con cURL y devuelve el JSON decodificado (o null). */
+/**
+ * Consulta una URL externa con cURL y devuelve el JSON decodificado (o null).
+ *
+ * Wikipedia y Wikidata responden 429 (límite de consultas) con una ventana de
+ * ~45 s. Si el servidor lo indica en Retry-After no reintentamos (no serviría);
+ * si la espera es corta o falla un 5xx, reintentamos una vez. El resto de fallos
+ * devuelve null sin esperas, para no tardar en la búsqueda.
+ */
 function consultar_api($url)
 {
-    $curl = curl_init($url);
-    curl_setopt_array($curl, [
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_TIMEOUT => 8,
-        CURLOPT_CONNECTTIMEOUT => 5,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_MAXREDIRS => 3,
-        CURLOPT_HTTPHEADER => [
-            'Accept: application/json',
-            'User-Agent: CINEsesitasVerlas/2.0 (aplicacion academica)',
-        ],
-    ]);
-    $respuesta = curl_exec($curl);
-    curl_close($curl);
+    for ($intento = 0; $intento < 2; $intento++) {
+        if ($intento > 0) {
+            usleep(1200000); /* 1,2 s de tregua antes de reintentar */
+        }
 
-    if ($respuesta === false) {
+        $esperaRetry = 0;
+        $curl = curl_init($url);
+        curl_setopt_array($curl, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_TIMEOUT => 8,
+            CURLOPT_CONNECTTIMEOUT => 5,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_MAXREDIRS => 3,
+            CURLOPT_HTTPHEADER => [
+                'Accept: application/json',
+                'User-Agent: CINEsesitasVerlas/2.0 (aplicacion academica)',
+            ],
+            /* Guardamos Retry-After para avisar al usuario con un tiempo real. */
+            CURLOPT_HEADERFUNCTION => function ($manejador, $cabecera) use (&$esperaRetry) {
+                $partes = explode(':', $cabecera, 2);
+                if (count($partes) === 2 && strtolower(trim($partes[0])) === 'retry-after') {
+                    $esperaRetry = max(0, (int) trim($partes[1]));
+                }
+                return strlen($cabecera);
+            },
+        ]);
+        $respuesta = curl_exec($curl);
+        $codigo = (int) curl_getinfo($curl, CURLINFO_RESPONSE_CODE);
+        curl_close($curl);
+
+        if ($respuesta === false || $codigo === 0 || $codigo >= 400) {
+            if ($codigo === 429 || $codigo >= 500) {
+                if ($codigo === 429) {
+                    /* Publicamos la espera que pide el servidor (si la hay). */
+                    $GLOBALS['api_espera'] = $esperaRetry;
+                    if ($esperaRetry > 3) {
+                        return null; /* Reintentar a los 1,2 s daría 429 otra vez */
+                    }
+                }
+                continue;
+            }
+            return null;
+        }
+
+        $datos = json_decode($respuesta, true);
+        if (is_array($datos)) {
+            return $datos;
+        }
+        /* Cuerpo que no es JSON (páginas de error): no insiste. */
         return null;
     }
-    $datos = json_decode($respuesta, true);
+
+    return null;
+}
+
+/** Segundos que el último 429 pidió esperar (0 si no hubo límite). */
+function espera_recomendada()
+{
+    return (int) ($GLOBALS['api_espera'] ?? 0);
+}
+
+/* ================= Caché de consultas externas ================= */
+
+/**
+ * Wikipedia permite ~10 peticiones por ventana y luego bloquea 45 s. Guardamos
+ * en MySQL tanto los resultados de cada búsqueda como los datos de cada entidad
+ * de Wikidata: una consulta repetida no vuelve a gastar una llamada externa.
+ *
+ * Devuelve el array guardado o null (no había, caducó, o no hay conexión).
+ */
+function leer_cache($conexion, $clave)
+{
+    if (!($conexion instanceof mysqli)) {
+        return null;
+    }
+    $sentencia = $conexion->prepare('SELECT datos, expira FROM cache_externa WHERE clave = ?');
+    if (!$sentencia) {
+        return null;
+    }
+    $sentencia->bind_param('s', $clave);
+    if (!$sentencia->execute()) {
+        $sentencia->close();
+        return null;
+    }
+    $fila = $sentencia->get_result()->fetch_assoc();
+    $sentencia->close();
+
+    if (!$fila) {
+        return null;
+    }
+    if (strtotime($fila['expira']) < time()) {
+        $borrado = $conexion->prepare('DELETE FROM cache_externa WHERE clave = ?');
+        if ($borrado) {
+            $borrado->bind_param('s', $clave);
+            $borrado->execute();
+            $borrado->close();
+        }
+        return null;
+    }
+    $datos = json_decode($fila['datos'], true);
     return is_array($datos) ? $datos : null;
+}
+
+/** Guarda (o actualiza) una entrada de la caché con la vida indicada. */
+function guardar_cache($conexion, $clave, $datos, $segundos)
+{
+    if (!($conexion instanceof mysqli) || !is_array($datos)) {
+        return;
+    }
+    $expira = date('Y-m-d H:i:s', time() + $segundos);
+    $contenido = json_encode($datos, JSON_UNESCAPED_UNICODE);
+    if ($contenido === false) {
+        return;
+    }
+    $sentencia = $conexion->prepare(
+        'INSERT INTO cache_externa (clave, datos, expira) VALUES (?, ?, ?)
+         ON DUPLICATE KEY UPDATE datos = VALUES(datos), expira = VALUES(expira)'
+    );
+    if (!$sentencia) {
+        return;
+    }
+    $sentencia->bind_param('sss', $clave, $contenido, $expira);
+    $sentencia->execute();
+    $sentencia->close();
 }
 
 /* ================= Conexión ================= */
@@ -104,6 +215,17 @@ function instalar_base()
             estado VARCHAR(20) NOT NULL DEFAULT "pendiente",
             notas VARCHAR(600) NOT NULL DEFAULT "",
             creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
+    );
+
+    /* Caché de las consultas a APIs externas (ver leer_cache/guardar_cache). */
+    $conexion->query(
+        'CREATE TABLE IF NOT EXISTS cache_externa (
+            clave VARCHAR(190) NOT NULL,
+            datos MEDIUMTEXT NOT NULL,
+            expira DATETIME NOT NULL,
+            PRIMARY KEY (clave),
+            KEY idx_cache_expira (expira)
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4'
     );
 

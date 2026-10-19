@@ -27,3 +27,15 @@ CREATE TABLE IF NOT EXISTS peliculas (
   notas VARCHAR(600) NOT NULL DEFAULT '',
   creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+-- Caché de las consultas a Wikipedia/Wikidata/TMDB.
+-- Wikipedia solo admite ~10 peticiones por ventana y luego bloquea 45 s,
+-- así que una búsqueda repetida se responde desde aquí sin volver a
+-- consultar la API. Se llena solo, con datos reales; nunca con ejemplos.
+CREATE TABLE IF NOT EXISTS cache_externa (
+  clave VARCHAR(190) NOT NULL,
+  datos MEDIUMTEXT NOT NULL,
+  expira DATETIME NOT NULL,
+  PRIMARY KEY (clave),
+  KEY idx_cache_expira (expira)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
