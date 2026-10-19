@@ -71,7 +71,18 @@ if (TMDB_API_KEY !== '') {
     }
 }
 
-responder_json(['ok' => true, 'modo' => 'wikipedia', 'peliculas' => buscar_en_wikipedia($buscar)]);
+$peliculas = buscar_en_wikipedia($buscar);
+
+/* null = la API externa no respondió (límite de consultas o caída).
+   No lo presentamos como «sin resultados»: avisamos al usuario. */
+if ($peliculas === null) {
+    responder_json([
+        'ok' => false,
+        'mensaje' => 'Wikipedia no responde ahora (límite de consultas); intenta en unos segundos.',
+    ]);
+}
+
+responder_json(['ok' => true, 'modo' => 'wikipedia', 'peliculas' => $peliculas]);
 
 /* ================= Proveedor TMDB (requiere clave gratuita) ================= */
 
@@ -118,13 +129,20 @@ function buscar_en_wikipedia($texto)
         'https://es.wikipedia.org/w/api.php?action=query&format=json&utf8=1'
         . '&list=search&srsearch=' . urlencode($texto) . '&srlimit=16'
     );
-    if (!$busqueda || empty($busqueda['query']['search'])) {
+    /* Distinguimos «la API no respondió» (null) de «no hubo coincidencias» ([]). */
+    if (!$busqueda) {
+        return null;
+    }
+    if (empty($busqueda['query']['search'])) {
         return [];
     }
 
+    /* Guardamos el orden de relevancia del search para no perderlo después. */
+    $ordenBusqueda = [];
     $titulos = [];
-    foreach ($busqueda['query']['search'] as $item) {
+    foreach ($busqueda['query']['search'] as $indice => $item) {
         $titulos[] = $item['title'];
+        $ordenBusqueda[$item['title']] = $indice;
     }
 
     /* 2) Resumen, descripción, miniatura y QID de Wikidata de cada artículo. */
@@ -135,8 +153,20 @@ function buscar_en_wikipedia($texto)
         . '&ppprop=wikibase_item&exintro=1&explaintext=1&exlimit=max'
         . '&piprop=thumbnail&pithumbsize=400&titles=' . $codificados
     );
-    if (!$fichas || empty($fichas['query']['pages'])) {
+    if (!$fichas) {
+        return null;
+    }
+    if (empty($fichas['query']['pages'])) {
         return [];
+    }
+
+    /* Mapa título del search → título final (por redirecciones/normalización)
+          para poder recuperar el índice de relevancia de cada página. */
+    $tituloOriginal = [];
+    foreach (['normalized', 'redirects'] as $tipo) {
+        foreach (($fichas['query'][$tipo] ?? []) as $cambio) {
+            $tituloOriginal[$cambio['to']] = $cambio['from'];
+        }
     }
 
     $fichasPorQid = [];
@@ -150,6 +180,9 @@ function buscar_en_wikipedia($texto)
         if ($titulo === '' || $sinopsis === '') {
             continue;
         }
+        /* Índice de relevancia en el search (los desconocidos van al final). */
+        $original = $tituloOriginal[$titulo] ?? $titulo;
+        $orden = $ordenBusqueda[$original] ?? ($ordenBusqueda[$titulo] ?? 999);
         $qid = $pagina['pageprops']['wikibase_item'] ?? '';
         if ($qid !== '') {
             $qids[$qid] = true;
@@ -160,6 +193,7 @@ function buscar_en_wikipedia($texto)
             'sinopsis' => $sinopsis,
             'descripcion' => trim($pagina['description'] ?? ''),
             'poster' => $pagina['thumbnail']['source'] ?? '',
+            'orden' => $orden,
         ];
     }
 
@@ -167,12 +201,15 @@ function buscar_en_wikipedia($texto)
           como «tráiler», P3831 = Q622550, y si no hay usamos el primero). */
     $trailers = trailer_de_wikidata(array_keys($qids));
 
-    /* 4) Armo la lista: primero lo que parece película, después el resto. */
+    /* 4) Armo la lista: primero lo que parece película, después el resto.
+          Cada grupo conserva el orden de relevancia del search (hallazgo 3).
+          El /u es imprescindible: sin él [íi] casa bytes y «película» nunca
+          coincide en UTF-8 (hallazgo 1). */
     $peliculas = [];
     $otros = [];
     foreach ($fichasPorQid as $clave => $ficha) {
         $coincideCine = preg_match(
-            '/pel[íi]cula|film|largometraje|cine/i',
+            '/pel[íi]cula|film|largometraje|cine/iu',
             $ficha['descripcion'] . ' ' . mb_substr($ficha['sinopsis'], 0, 160)
         );
         $item = [
@@ -185,6 +222,7 @@ function buscar_en_wikipedia($texto)
             'poster' => $ficha['poster'],
             'trailer' => $trailers[$clave] ?? ($ficha['qid'] !== '' ? ($trailers[$ficha['qid']] ?? '') : ''),
             'enlace' => 'https://es.wikipedia.org/wiki/' . rawurlencode(str_replace(' ', '_', $ficha['titulo'])),
+            'orden' => $ficha['orden'],
         ];
         if ($coincideCine) {
             $peliculas[] = $item;
@@ -193,7 +231,21 @@ function buscar_en_wikipedia($texto)
         }
     }
 
-    return array_slice(array_merge($peliculas, $otros), 0, 8);
+    /* Ordena cada grupo por la posición original en el search. */
+    $porRelevancia = function ($a, $b) {
+        return $a['orden'] <=> $b['orden'];
+    };
+    usort($peliculas, $porRelevancia);
+    usort($otros, $porRelevancia);
+
+    $resultado = array_merge($peliculas, $otros);
+    /* Quita el campo interno antes de devolver. */
+    foreach ($resultado as &$item) {
+        unset($item['orden']);
+    }
+    unset($item);
+
+    return array_slice($resultado, 0, 8);
 }
 
 /** Devuelve [qid => id_de_video_de_youtube] para los QIDs dados. */
