@@ -18,6 +18,7 @@ document.addEventListener('DOMContentLoaded', function () {
   var iframe = document.getElementById('iframe-trailer');
   var tituloModal = document.getElementById('modal-trailer-titulo');
   var btnCerrar = document.getElementById('btn-cerrar-trailer');
+  var ultimoGatillo = null; /* botón que abrió el modal: recupera el foco al cerrar */
 
   if (formBuscar) {
     formBuscar.addEventListener('submit', function (evento) {
@@ -29,6 +30,18 @@ document.addEventListener('DOMContentLoaded', function () {
   if (btnCerrar) {
     btnCerrar.addEventListener('click', cerrarTrailer);
   }
+
+  /* El botón «▶ Tráiler» de las películas guardadas en la cartelera abre
+     el mismo modal (manejador delegado: funciona también para filas nuevas). */
+  document.addEventListener('click', function (evento) {
+    var objetivo = evento.target;
+    var boton = objetivo && objetivo.closest ? objetivo.closest('.btn-trailer') : null;
+    if (!boton) { return; }
+    abrirTrailer(
+      boton.getAttribute('data-trailer') || '',
+      boton.getAttribute('data-titulo') || ''
+    );
+  });
   if (modal) {
     modal.addEventListener('click', function (evento) {
       if (evento.target === modal) {
@@ -64,7 +77,8 @@ document.addEventListener('DOMContentLoaded', function () {
       return;
     }
 
-    caja.innerHTML = '<p class="vacio">Buscando «' + escapar(texto) + '»…</p>';
+    /* Pantalla de carga: tarjetas fantasma con brillo en vez de texto vacío */
+    pintarEsqueletos(8);
     if (cuenta) { cuenta.textContent = 'buscando…'; }
 
     fetch('api/pelicula.php?buscar=' + encodeURIComponent(texto))
@@ -82,6 +96,25 @@ document.addEventListener('DOMContentLoaded', function () {
         caja.innerHTML = '<p class="vacio">No se pudo consultar el servicio. Revisa tu conexión a internet.</p>';
         if (cuenta) { cuenta.textContent = ''; }
       });
+  }
+
+  /* Tarjetas fantasma con animación de brillo mientras responde el servidor:
+     la rejilla ocupa su sitio real y el salto final es mínimo. */
+  function pintarEsqueletos(cantidad) {
+    var html = '';
+    for (var i = 0; i < cantidad; i++) {
+      html += '<article class="tarjeta esqueleto" aria-hidden="true">' +
+        '<div class="tarjeta-poster">' +
+        '<span class="esqueleto-caja esqueleto-poster"></span>' +
+        '</div>' +
+        '<div class="tarjeta-cuerpo">' +
+        '<span class="esqueleto-caja esqueleto-linea esqueleto-linea-ancha"></span>' +
+        '<span class="esqueleto-caja esqueleto-linea"></span>' +
+        '<span class="esqueleto-caja esqueleto-boton"></span>' +
+        '</div>' +
+        '</article>';
+    }
+    caja.innerHTML = html;
   }
 
   function pintarResultados(datos) {
@@ -206,7 +239,7 @@ document.addEventListener('DOMContentLoaded', function () {
     /* Las referencias tmdb:NNN se resuelven contra api/pelicula.php */
     if (/^tmdb:\d+$/.test(referencia)) {
       tituloModal.textContent = 'Cargando tráiler…';
-      modal.hidden = false;
+      mostrarModal();
       iframe.src = '';
 
       fetch('api/pelicula.php?trailer=' + encodeURIComponent(referencia))
@@ -227,16 +260,31 @@ document.addEventListener('DOMContentLoaded', function () {
     reproducir(referencia, titulo);
   }
 
+  /* Abre el diálogo, recuerda quién lo pidió y lleva el foco dentro
+     (buena práctica ARIA: el foco no queda en la página de fondo). */
+  function mostrarModal() {
+    if (modal.hidden) {
+      ultimoGatillo = document.activeElement;
+      modal.hidden = false;
+      if (btnCerrar) { btnCerrar.focus(); }
+    }
+  }
+
   function reproducir(idYoutube, titulo) {
     tituloModal.textContent = 'Tráiler · ' + (titulo || '');
     iframe.src = 'https://www.youtube-nocookie.com/embed/' + encodeURIComponent(idYoutube) + '?autoplay=1';
-    modal.hidden = false;
+    mostrarModal();
   }
 
   function cerrarTrailer() {
-    if (!modal) { return; }
+    if (!modal || modal.hidden) { return; }
     modal.hidden = true;
     iframe.src = ''; /* detiene la reproducción */
+    /* Devuelve el foco al botón que abrió el modal (o al principio de la página). */
+    if (ultimoGatillo && typeof ultimoGatillo.focus === 'function') {
+      ultimoGatillo.focus();
+    }
+    ultimoGatillo = null;
   }
 
   /* ============ Caso de Ajax 3: guardar en la cartelera ============ */

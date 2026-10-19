@@ -19,6 +19,10 @@
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Imprescindible: cualquier regla de clase con `display` (p. ej. la del modal)
+   ganaría a la hoja del navegador y el atributo hidden no ocultaría nada. */
+[hidden] { display: none !important; }
+
 body {
   background: var(--fondo);
   color: var(--texto);
@@ -282,6 +286,29 @@ main { flex: 1; padding: 28px 0 40px; }
   padding: 40px 20px;
 }
 
+/* ---------- Esqueletos de carga (la rejilla espera con el mismo formato) ---------- */
+.esqueleto { pointer-events: none; }
+.esqueleto-caja {
+  display: block;
+  background: linear-gradient(
+    100deg,
+    var(--superficie-2) 25%,
+    #2a2440 45%,
+    var(--superficie-2) 65%
+  );
+  background-size: 200% 100%;
+  animation: brillo 1.2s linear infinite;
+  border-radius: 7px;
+}
+.esqueleto-poster { width: 70%; height: 96px; }
+.esqueleto-linea { height: 13px; margin-bottom: 11px; width: 88%; }
+.esqueleto-linea-ancha { width: 88%; height: 17px; }
+.esqueleto-boton { height: 30px; width: 116px; margin-top: 14px; border-radius: 999px; }
+
+@keyframes brillo {
+  to { background-position: -200% 0; }
+}
+
 /* ---------- Paginador ---------- */
 .paginador {
   display: flex;
@@ -542,4 +569,16 @@ main { flex: 1; padding: 28px 0 40px; }
   .rejilla { grid-template-columns: 1fr; }
   .menu { justify-content: center; }
   .marca-nombre { font-size: 1.55rem; }
+}
+
+/* ---------- Accesibilidad: quien pide poca animación, poca animación ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

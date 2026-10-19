@@ -105,7 +105,7 @@ include 'plantilla/cabecera.php';
   <section class="bloque">
     <div class="bloque-titulo">
       <h2>Resultados de búsqueda</h2>
-      <span class="cuenta-verificadas" id="cuenta-resultados"></span>
+      <span class="cuenta-verificadas" id="cuenta-resultados" aria-live="polite"></span>
     </div>
     <div class="rejilla" id="caja-resultados">
       <p class="vacio">Escribe un título arriba y toca «Buscar» para ver las películas encontradas.</p>
@@ -113,7 +113,8 @@ include 'plantilla/cabecera.php';
   </section>
 
   <!-- Reproductor de tráiler (se rellena con Ajax) -->
-  <div class="modal-trailer" id="modal-trailer" hidden>
+  <div class="modal-trailer" id="modal-trailer" role="dialog" aria-modal="true"
+       aria-labelledby="modal-trailer-titulo" hidden>
     <div class="modal-trailer-caja">
       <div class="modal-trailer-barra">
         <strong id="modal-trailer-titulo">Tráiler</strong>

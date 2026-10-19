@@ -102,6 +102,10 @@ function espera_recomendada()
 
 /* ================= Caché de consultas externas ================= */
 
+/* Si cambia la forma de los datos guardados, sube la versión: así las
+   respuestas guardadas con el código anterior caducan enseguida. */
+define('CACHE_VERSION', 1);
+
 /**
  * Wikipedia permite ~10 peticiones por ventana y luego bloquea 45 s. Guardamos
  * en MySQL tanto los resultados de cada búsqueda como los datos de cada entidad

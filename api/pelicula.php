@@ -69,7 +69,8 @@ if ($buscar === '' || mb_strlen($buscar) > 80) {
 /* Clave de caché: lo que se busca + el proveedor activo (vida de 6 horas).
    Una repetición responde al instante y sin gastar una sola llamada externa. */
 $proveedor = TMDB_API_KEY !== '' ? 'tmdb' : 'wikipedia';
-$claveBusqueda = 'consulta:' . $proveedor . ':' . mb_strtolower(preg_replace('/\s+/u', ' ', $buscar));
+$claveBusqueda = 'consulta:' . CACHE_VERSION . ':' . $proveedor . ':'
+    . mb_strtolower(preg_replace('/\s+/u', ' ', $buscar));
 
 $enCache = leer_cache($conexion, $claveBusqueda);
 if ($enCache !== null) {
@@ -129,7 +130,9 @@ function buscar_en_tmdb($texto)
             'poster' => !empty($item['poster_path'])
                 ? 'https://image.tmdb.org/t/p/w342' . $item['poster_path']
                 : '',
-            'trailer' => '',
+            /* Referencia que el modal resuelve bajo demanda (ver buscador.js):
+               al pulsar «Ver tráiler» se pide api/pelicula.php?trailer=tmdb:NNN */
+            'trailer' => 'tmdb:' . $id,
             'enlace' => 'https://www.themoviedb.org/movie/' . $id,
         ];
     }
@@ -275,7 +278,7 @@ function datos_de_wikidata($qids, $conexion = null)
     $fichas = [];
     $faltan = [];
     foreach ($qids as $qid) {
-        $guardado = leer_cache($conexion, 'entidad:' . $qid);
+        $guardado = leer_cache($conexion, 'entidad:' . CACHE_VERSION . ':' . $qid);
         if ($guardado !== null) {
             $fichas[$qid] = $guardado;
         } else {
@@ -329,7 +332,7 @@ function datos_de_wikidata($qids, $conexion = null)
         }
 
         /* Se guarda también la entidad sin nada, para no volver a pedirla. */
-        guardar_cache($conexion, 'entidad:' . $qid, $ficha, 604800);
+        guardar_cache($conexion, 'entidad:' . CACHE_VERSION . ':' . $qid, $ficha, 604800);
         $fichas[$qid] = $ficha;
     }
 
