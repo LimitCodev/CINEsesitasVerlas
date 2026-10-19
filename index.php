@@ -81,6 +81,13 @@ include 'plantilla/cabecera.php';
 ?>
   <!-- Buscador de películas: los resultados llegan por Ajax, sin recargar -->
   <section class="hero">
+    <p class="modo-activo" id="etiqueta-modo">
+      <?php if (TMDB_API_KEY === ''): ?>
+        <span class="modo-punto"></span> Modo demo sin clave · datos reales de Wikipedia + Wikidata
+      <?php else: ?>
+        <span class="modo-punto"></span> Modo TMDB · búsqueda, pósteres y tráileres oficiales
+      <?php endif; ?>
+    </p>
     <h1>Busca una película y mira su tráiler</h1>
     <p class="hero-texto">
       Escribe un título (ej. «doom», «dune», «oppenheimer») y el sistema lo busca
@@ -172,7 +179,8 @@ include 'plantilla/cabecera.php';
         <article class="tarjeta">
           <div class="tarjeta-poster">
             <?php if ($p['poster'] !== ''): ?>
-              <img src="<?= e($p['poster']) ?>" alt="Póster de <?= e($p['titulo']) ?>" loading="lazy">
+              <img src="<?= e($p['poster']) ?>" alt="Póster de <?= e($p['titulo']) ?>" loading="lazy"
+                   onerror="this.outerHTML='<span class=&quot;poster-inicial&quot;><?= e(mb_strtoupper(mb_substr($p['titulo'], 0, 1))) ?></span>'">
             <?php else: ?>
               <span class="poster-inicial"><?= e(mb_strtoupper(mb_substr($p['titulo'], 0, 1))) ?></span>
             <?php endif; ?>

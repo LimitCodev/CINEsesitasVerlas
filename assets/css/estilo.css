@@ -338,6 +338,29 @@ main { flex: 1; padding: 28px 0 40px; }
   margin: 0 auto 20px;
   font-size: 0.97rem;
 }
+/* Indicador del proveedor activo: «modo demo sin clave» o «modo TMDB». */
+.modo-activo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.74rem;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--ambar-claro);
+  background: rgba(255, 183, 3, 0.08);
+  border: 1px solid rgba(255, 183, 3, 0.3);
+  border-radius: 999px;
+  padding: 5px 14px;
+  margin-bottom: 20px;
+}
+.modo-punto {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #37d67a;
+  box-shadow: 0 0 0 3px rgba(55, 214, 122, 0.18);
+  flex-shrink: 0;
+}
 .buscador-grande {
   display: flex;
   flex-wrap: wrap;

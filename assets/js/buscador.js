@@ -42,6 +42,17 @@ document.addEventListener('DOMContentLoaded', function () {
     }
   });
 
+  /* Muestra el proveedor realmente usado y si la respuesta vino de la caché. */
+  function actualizarModo(datos) {
+    var etiqueta = document.getElementById('etiqueta-modo');
+    if (!etiqueta) { return; }
+    var esTmdb = datos.modo === 'tmdb';
+    etiqueta.innerHTML = '<span class="modo-punto"></span> ' +
+      (esTmdb ? 'Modo TMDB con clave' : 'Modo demo sin clave') +
+      ' · ' + (esTmdb ? 'pósteres y tráileres oficiales' : 'datos reales de Wikipedia + Wikidata') +
+      (datos.cache ? ' · respuesta guardada, instantánea' : '');
+  }
+
   /* ============ Caso de Ajax 1: búsqueda de películas ============ */
   function buscarPeliculas() {
     var texto = entrada.value.trim();
@@ -64,6 +75,7 @@ document.addEventListener('DOMContentLoaded', function () {
           if (cuenta) { cuenta.textContent = ''; }
           return;
         }
+        actualizarModo(datos);
         pintarResultados(datos);
       })
       .catch(function () {
@@ -93,17 +105,23 @@ document.addEventListener('DOMContentLoaded', function () {
       /* Póster */
       var zonaPoster = document.createElement('div');
       zonaPoster.className = 'tarjeta-poster';
+      var marcador = document.createElement('span');
+      marcador.className = 'poster-inicial';
+      marcador.textContent = (peli.titulo || '?').charAt(0).toUpperCase();
       if (peli.poster) {
         var img = document.createElement('img');
         img.src = peli.poster;
         img.alt = 'Póster de ' + peli.titulo;
         img.loading = 'lazy';
+        /* Si la imagen no existe o no carga, va el marcador: nunca un ícono roto. */
+        img.onerror = function () {
+          if (img.parentNode === zonaPoster) {
+            zonaPoster.replaceChild(marcador, img);
+          }
+        };
         zonaPoster.appendChild(img);
       } else {
-        var inicial = document.createElement('span');
-        inicial.className = 'poster-inicial';
-        inicial.textContent = (peli.titulo || '?').charAt(0).toUpperCase();
-        zonaPoster.appendChild(inicial);
+        zonaPoster.appendChild(marcador);
       }
       var insignia = document.createElement('span');
       insignia.className = 'tarjeta-genero';
