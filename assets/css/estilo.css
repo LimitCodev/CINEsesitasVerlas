@@ -14,6 +14,7 @@
   --texto: #f4f1ff;
   --texto-suave: #a9a2c4;
   --radio: 14px;
+  --fuente-titulos: "Bebas Neue", "Arial Narrow", Impact, sans-serif;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -33,10 +34,19 @@ body {
   margin: 0 auto;
 }
 
-/* ---------- Encabezado ---------- */
+/* ---------- Encabezado (con bombillas de marquesina) ---------- */
 .encabezado {
   background: var(--superficie);
   border-bottom: 2px solid var(--ambar);
+}
+
+.encabezado::before {
+  content: "";
+  display: block;
+  height: 14px;
+  background:
+    radial-gradient(circle 3px at 11px 7px, var(--ambar-claro) 98%, transparent 100%) 0 0 / 22px 14px repeat-x,
+    var(--superficie-2);
 }
 
 .encabezado-interno {
@@ -48,18 +58,27 @@ body {
   padding: 14px 0;
 }
 
-.marca { text-decoration: none; color: var(--texto); }
+.marca {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-decoration: none;
+  color: var(--texto);
+}
+.marca-logo { flex-shrink: 0; }
 .marca-nombre {
   display: block;
-  font-size: 1.5rem;
-  font-weight: 800;
-  letter-spacing: 1px;
+  font-family: var(--fuente-titulos);
+  font-weight: 400;
+  font-size: 1.85rem;
+  letter-spacing: 2px;
+  line-height: 1;
   text-transform: uppercase;
 }
 .marca-separado { color: var(--ambar); }
 .marca-lema {
   display: block;
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: var(--texto-suave);
   letter-spacing: 3px;
   text-transform: uppercase;
@@ -103,7 +122,13 @@ main { flex: 1; padding: 28px 0 40px; }
   gap: 14px;
   margin-bottom: 22px;
 }
-.titulo-seccion h1 { font-size: 1.9rem; line-height: 1.2; }
+.titulo-seccion h1 {
+  font-family: var(--fuente-titulos);
+  font-weight: 400;
+  font-size: 2.5rem;
+  letter-spacing: 1.5px;
+  line-height: 1.1;
+}
 .subtitulo { color: var(--texto-suave); font-size: 0.95rem; }
 
 /* ---------- Mensajes ---------- */
@@ -117,7 +142,30 @@ main { flex: 1; padding: 28px 0 40px; }
 .aviso-correcto { background: rgba(46, 204, 113, 0.12); border: 1px solid #2ecc71; color: #7ff0b2; }
 .aviso-error { background: rgba(230, 57, 70, 0.12); border: 1px solid var(--carmesi); color: #ff9aa4; }
 
-/* ---------- Rejilla de tarjetas ---------- */
+/* ---------- Buscador ---------- */
+.buscador {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 14px;
+  margin-bottom: 22px;
+}
+.buscador-entrada {
+  flex: 1;
+  min-width: 220px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  color: var(--texto);
+  padding: 11px 14px;
+  font-size: 0.97rem;
+}
+.buscador-entrada:focus { outline: none; border-color: var(--ambar); }
+
+/* ---------- Rejilla de tarjetas (boleto de cine) ---------- */
 .rejilla {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
@@ -125,13 +173,32 @@ main { flex: 1; padding: 28px 0 40px; }
 }
 
 .tarjeta {
+  position: relative;
   background: var(--superficie);
   border: 1px solid var(--borde);
   border-radius: var(--radio);
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  transition: transform 0.18s, border-color 0.18s;
 }
+.tarjeta:hover { transform: translateY(-4px); border-color: var(--ambar); }
+
+/* Muescas laterales del boleto, sobre el borde punteado */
+.tarjeta::before,
+.tarjeta::after {
+  content: "";
+  position: absolute;
+  top: 160px;
+  width: 20px;
+  height: 20px;
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  border-radius: 50%;
+  z-index: 2;
+}
+.tarjeta::before { left: -11px; }
+.tarjeta::after { right: -11px; }
 
 .tarjeta-poster {
   position: relative;
@@ -143,8 +210,9 @@ main { flex: 1; padding: 28px 0 40px; }
 }
 .tarjeta-poster img { width: 100%; height: 100%; object-fit: cover; }
 .poster-inicial {
-  font-size: 4rem;
-  font-weight: 800;
+  font-family: var(--fuente-titulos);
+  font-size: 5rem;
+  line-height: 1;
   color: var(--ambar);
   opacity: 0.75;
 }
@@ -162,8 +230,21 @@ main { flex: 1; padding: 28px 0 40px; }
   border-radius: 999px;
 }
 
-.tarjeta-cuerpo { padding: 16px; display: flex; flex-direction: column; gap: 10px; flex: 1; }
-.tarjeta-cuerpo h2 { font-size: 1.12rem; line-height: 1.3; }
+.tarjeta-cuerpo {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  flex: 1;
+  border-top: 2px dashed var(--borde);
+}
+.tarjeta-cuerpo h2 {
+  font-family: var(--fuente-titulos);
+  font-weight: 400;
+  font-size: 1.4rem;
+  letter-spacing: 1px;
+  line-height: 1.15;
+}
 
 .tarjeta-datos { list-style: none; font-size: 0.88rem; color: var(--texto); }
 .tarjeta-datos li {
@@ -200,6 +281,86 @@ main { flex: 1; padding: 28px 0 40px; }
   border-radius: var(--radio);
   padding: 40px 20px;
 }
+
+/* ---------- Paginador ---------- */
+.paginador {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 28px;
+}
+.paginador-enlace {
+  min-width: 38px;
+  text-align: center;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--borde);
+  background: var(--superficie);
+  color: var(--texto);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.9rem;
+  transition: border-color 0.15s, color 0.15s;
+}
+.paginador-enlace:hover { border-color: var(--ambar); color: var(--ambar); }
+.paginador-activo { background: var(--ambar); border-color: var(--ambar); color: #1a1405; }
+.paginador-info {
+  text-align: center;
+  color: var(--texto-suave);
+  font-size: 0.85rem;
+  margin-top: 10px;
+}
+
+/* ---------- Importador Ajax (TVMaze) ---------- */
+.importador {
+  background: var(--superficie);
+  border: 1px dashed var(--ambar);
+  border-radius: var(--radio);
+  padding: 20px;
+  margin-bottom: 22px;
+}
+.importador h2 {
+  font-family: var(--fuente-titulos);
+  font-weight: 400;
+  font-size: 1.6rem;
+  letter-spacing: 1px;
+  margin-bottom: 4px;
+}
+.importador .subtitulo { margin-bottom: 14px; }
+.importador-busqueda { display: flex; flex-wrap: wrap; gap: 10px; }
+.importador-busqueda input {
+  flex: 1;
+  min-width: 220px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  color: var(--texto);
+  padding: 11px 14px;
+  font-size: 0.97rem;
+}
+.importador-busqueda input:focus { outline: none; border-color: var(--ambar); }
+.importador-resultados { margin-top: 14px; }
+
+.lista-resultados { display: flex; flex-direction: column; gap: 8px; }
+.resultado-fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--superficie-2);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  padding: 10px 14px;
+}
+.resultado-info { display: flex; flex-direction: column; gap: 2px; }
+.resultado-info span { font-size: 0.82rem; color: var(--texto-suave); }
+
+.mensaje-api { font-size: 0.9rem; color: var(--texto-suave); }
+.mensaje-aviso { color: var(--ambar-claro); }
+.mensaje-error { color: #ff9aa4; }
+.mensaje-exito { color: #7ff0b2; }
 
 /* ---------- Formulario ---------- */
 .formulario {
@@ -240,103 +401,6 @@ main { flex: 1; padding: 28px 0 40px; }
 }
 .acciones-formulario { display: flex; gap: 12px; flex-wrap: wrap; }
 
-/* ---------- Buscador ---------- */
-.buscador {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  background: var(--superficie);
-  border: 1px solid var(--borde);
-  border-radius: var(--radio);
-  padding: 14px;
-  margin-bottom: 22px;
-}
-.buscador-entrada {
-  flex: 1;
-  min-width: 220px;
-  background: var(--superficie-2);
-  border: 1px solid var(--borde);
-  border-radius: 8px;
-  color: var(--texto);
-  padding: 11px 14px;
-  font-size: 0.97rem;
-}
-.buscador-entrada:focus { outline: none; border-color: var(--ambar); }
-
-/* ---------- Paginador ---------- */
-.paginador {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 8px;
-  margin-top: 28px;
-}
-.paginador-enlace {
-  min-width: 38px;
-  text-align: center;
-  padding: 8px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--borde);
-  background: var(--superficie);
-  color: var(--texto);
-  text-decoration: none;
-  font-weight: 700;
-  font-size: 0.9rem;
-  transition: border-color 0.15s, background 0.15s;
-}
-.paginador-enlace:hover { border-color: var(--ambar); color: var(--ambar); }
-.paginador-activo { background: var(--ambar); border-color: var(--ambar); color: #1a1405; }
-.paginador-info {
-  text-align: center;
-  color: var(--texto-suave);
-  font-size: 0.85rem;
-  margin-top: 10px;
-}
-
-/* ---------- Importador Ajax (TVMaze) ---------- */
-.importador {
-  background: var(--superficie);
-  border: 1px dashed var(--ambar);
-  border-radius: var(--radio);
-  padding: 20px;
-  margin-bottom: 22px;
-}
-.importador h2 { font-size: 1.15rem; margin-bottom: 4px; }
-.importador .subtitulo { margin-bottom: 14px; }
-.importador-busqueda { display: flex; flex-wrap: wrap; gap: 10px; }
-.importador-busqueda input {
-  flex: 1;
-  min-width: 220px;
-  background: var(--superficie-2);
-  border: 1px solid var(--borde);
-  border-radius: 8px;
-  color: var(--texto);
-  padding: 11px 14px;
-  font-size: 0.97rem;
-}
-.importador-busqueda input:focus { outline: none; border-color: var(--ambar); }
-.importador-resultados { margin-top: 14px; }
-
-.lista-resultados { display: flex; flex-direction: column; gap: 8px; }
-.resultado-fila {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  background: var(--superficie-2);
-  border: 1px solid var(--borde);
-  border-radius: 8px;
-  padding: 10px 14px;
-}
-.resultado-info { display: flex; flex-direction: column; gap: 2px; }
-.resultado-info span { font-size: 0.82rem; color: var(--texto-suave); }
-
-.mensaje-api { font-size: 0.9rem; color: var(--texto-suave); }
-.mensaje-aviso { color: var(--ambar-claro); }
-.mensaje-error { color: #ff9aa4; }
-.mensaje-exito { color: #7ff0b2; }
-
 /* ---------- Pie ---------- */
 .pie {
   background: var(--superficie);
@@ -349,7 +413,18 @@ main { flex: 1; padding: 28px 0 40px; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 640px) {
-  .titulo-seccion h1 { font-size: 1.45rem; }
+  .titulo-seccion h1 { font-size: 1.95rem; }
   .encabezado-interno { justify-content: center; text-align: center; }
+  .marca { justify-content: center; }
   .formulario { padding: 18px; }
+  .rejilla { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+  .resultado-fila { flex-direction: column; align-items: flex-start; }
+  .paginador-enlace { min-width: 34px; padding: 7px 9px; font-size: 0.82rem; }
+  .paginador-info { font-size: 0.78rem; }
+}
+
+@media (max-width: 400px) {
+  .rejilla { grid-template-columns: 1fr; }
+  .menu { justify-content: center; }
+  .marca-nombre { font-size: 1.55rem; }
 }
