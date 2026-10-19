@@ -13,6 +13,9 @@
  */
 require_once __DIR__ . '/../config/base.php';
 
+/* Deja creada la base (y la tabla de caché) y devuelve la conexión. */
+$conexion = instalar_base();
+
 $buscar = trim($_GET['buscar'] ?? '');
 $trailer = trim($_GET['trailer'] ?? '');
 
@@ -63,25 +66,40 @@ if ($buscar === '' || mb_strlen($buscar) > 80) {
     responder_json(['ok' => false, 'mensaje' => 'Escribe un título para buscar (máx. 80 caracteres).']);
 }
 
+/* Clave de caché: lo que se busca + el proveedor activo (vida de 6 horas).
+   Una repetición responde al instante y sin gastar una sola llamada externa. */
+$proveedor = TMDB_API_KEY !== '' ? 'tmdb' : 'wikipedia';
+$claveBusqueda = 'consulta:' . $proveedor . ':' . mb_strtolower(preg_replace('/\s+/u', ' ', $buscar));
+
+$enCache = leer_cache($conexion, $claveBusqueda);
+if ($enCache !== null) {
+    responder_json(['ok' => true, 'modo' => $proveedor, 'cache' => true, 'peliculas' => $enCache]);
+}
+
 /* Si hay clave de TMDB se usa ese proveedor; si no, Wikipedia + Wikidata. */
 if (TMDB_API_KEY !== '') {
     $peliculas = buscar_en_tmdb($buscar);
     if ($peliculas !== null) {
+        guardar_cache($conexion, $claveBusqueda, $peliculas, 21600);
         responder_json(['ok' => true, 'modo' => 'tmdb', 'peliculas' => $peliculas]);
     }
 }
 
-$peliculas = buscar_en_wikipedia($buscar);
+$peliculas = buscar_en_wikipedia($buscar, $conexion);
 
 /* null = la API externa no respondió (límite de consultas o caída).
    No lo presentamos como «sin resultados»: avisamos al usuario. */
 if ($peliculas === null) {
+    $espera = espera_recomendada();
     responder_json([
         'ok' => false,
-        'mensaje' => 'Wikipedia no responde ahora (límite de consultas); intenta en unos segundos.',
+        'mensaje' => $espera > 0
+            ? 'Wikipedia limita las consultas: espera ' . $espera . ' s y vuelve a intentarlo.'
+            : 'Wikipedia no responde ahora (límite de consultas); intenta en unos segundos.',
     ]);
 }
 
+guardar_cache($conexion, $claveBusqueda, $peliculas, 21600);
 responder_json(['ok' => true, 'modo' => 'wikipedia', 'peliculas' => $peliculas]);
 
 /* ================= Proveedor TMDB (requiere clave gratuita) ================= */
@@ -120,58 +138,32 @@ function buscar_en_tmdb($texto)
 
 /* ================= Proveedor Wikipedia + Wikidata (sin clave) ================= */
 
-function buscar_en_wikipedia($texto)
+function buscar_en_wikipedia($texto, $conexion = null)
 {
-    /* 1) Lista de artículos que coinciden con la búsqueda. Pedimos 16 porque
-          los artículos de películas a veces quedan rankeados más abajo (el de
+    /* 1) Una sola petición trae todo: el generator devuelve los artículos
+          ordenados por relevancia (campo 'index') junto con su extracto,
+          descripción, miniatura y QID. Así cada búsqueda hace 2 peticiones en
+          vez de 3 y Wikipedia nos límite menos (evita el 429). Pedimos 16
+          porque los artículos de películas a veces rankean más abajo (el de
           «Doom» está en el puesto 10). */
-    $busqueda = consultar_api(
-        'https://es.wikipedia.org/w/api.php?action=query&format=json&utf8=1'
-        . '&list=search&srsearch=' . urlencode($texto) . '&srlimit=16'
-    );
-    /* Distinguimos «la API no respondió» (null) de «no hubo coincidencias» ([]). */
-    if (!$busqueda) {
-        return null;
-    }
-    if (empty($busqueda['query']['search'])) {
-        return [];
-    }
-
-    /* Guardamos el orden de relevancia del search para no perderlo después. */
-    $ordenBusqueda = [];
-    $titulos = [];
-    foreach ($busqueda['query']['search'] as $indice => $item) {
-        $titulos[] = $item['title'];
-        $ordenBusqueda[$item['title']] = $indice;
-    }
-
-    /* 2) Resumen, descripción, miniatura y QID de Wikidata de cada artículo. */
-    $codificados = implode('|', array_map('rawurlencode', $titulos));
-    $fichas = consultar_api(
+    $datos = consultar_api(
         'https://es.wikipedia.org/w/api.php?action=query&format=json&utf8=1&redirects=1'
+        . '&generator=search&gsrsearch=' . urlencode($texto) . '&gsrlimit=16&gsrnamespace=0'
         . '&prop=pageprops|extracts|description|pageimages'
         . '&ppprop=wikibase_item&exintro=1&explaintext=1&exlimit=max'
-        . '&piprop=thumbnail&pithumbsize=400&titles=' . $codificados
+        . '&piprop=thumbnail&pithumbsize=400'
     );
-    if (!$fichas) {
+    /* Distinguimos «la API no respondió» (null) de «no hubo coincidencias» ([]). */
+    if (!$datos) {
         return null;
     }
-    if (empty($fichas['query']['pages'])) {
+    if (empty($datos['query']['pages'])) {
         return [];
-    }
-
-    /* Mapa título del search → título final (por redirecciones/normalización)
-          para poder recuperar el índice de relevancia de cada página. */
-    $tituloOriginal = [];
-    foreach (['normalized', 'redirects'] as $tipo) {
-        foreach (($fichas['query'][$tipo] ?? []) as $cambio) {
-            $tituloOriginal[$cambio['to']] = $cambio['from'];
-        }
     }
 
     $fichasPorQid = [];
     $qids = [];
-    foreach ($fichas['query']['pages'] as $pagina) {
+    foreach ($datos['query']['pages'] as $pagina) {
         if (isset($pagina['missing'])) {
             continue;
         }
@@ -180,9 +172,8 @@ function buscar_en_wikipedia($texto)
         if ($titulo === '' || $sinopsis === '') {
             continue;
         }
-        /* Índice de relevancia en el search (los desconocidos van al final). */
-        $original = $tituloOriginal[$titulo] ?? $titulo;
-        $orden = $ordenBusqueda[$original] ?? ($ordenBusqueda[$titulo] ?? 999);
+        /* 'index' es la posición en el ranking de búsqueda (relevancia). */
+        $orden = isset($pagina['index']) ? (int) $pagina['index'] : 999;
         $qid = $pagina['pageprops']['wikibase_item'] ?? '';
         if ($qid !== '') {
             $qids[$qid] = true;
@@ -197,9 +188,9 @@ function buscar_en_wikipedia($texto)
         ];
     }
 
-    /* 3) Tráileres: propiedad P1651 de Wikidata (preferimos el calificado
-          como «tráiler», P3831 = Q622550, y si no hay usamos el primero). */
-    $trailers = trailer_de_wikidata(array_keys($qids));
+    /* 3) Tráileres e imagen: una sola petición a Wikidata (P1651 y P18),
+          con caché por entidad: lo ya consultado no se repite. */
+    $datosWikidata = datos_de_wikidata(array_keys($qids), $conexion);
 
     /* 4) Armo la lista: primero lo que parece película, después el resto.
           Cada grupo conserva el orden de relevancia del search (hallazgo 3).
@@ -207,11 +198,18 @@ function buscar_en_wikipedia($texto)
           coincide en UTF-8 (hallazgo 1). */
     $peliculas = [];
     $otros = [];
-    foreach ($fichasPorQid as $clave => $ficha) {
+    foreach ($fichasPorQid as $ficha) {
         $coincideCine = preg_match(
             '/pel[íi]cula|film|largometraje|cine/iu',
             $ficha['descripcion'] . ' ' . mb_substr($ficha['sinopsis'], 0, 160)
         );
+        /* Póster: primero la imagen P18 de Wikidata; si no, la de Wikipedia. */
+        $poster = $ficha['qid'] !== '' ? ($datosWikidata[$ficha['qid']]['poster'] ?? '') : '';
+        if ($poster === '') {
+            $poster = $ficha['poster'];
+        }
+        $trailer = $ficha['qid'] !== '' ? ($datosWikidata[$ficha['qid']]['trailer'] ?? '') : '';
+
         $item = [
             'fuente' => 'wikipedia',
             'id' => $ficha['qid'] !== '' ? $ficha['qid'] : $ficha['titulo'],
@@ -219,8 +217,8 @@ function buscar_en_wikipedia($texto)
             'anio' => primer_anio($ficha['descripcion'] . ' ' . mb_substr($ficha['sinopsis'], 0, 200)),
             'genero' => $ficha['descripcion'],
             'sinopsis' => mb_substr($ficha['sinopsis'], 0, 420),
-            'poster' => $ficha['poster'],
-            'trailer' => $trailers[$clave] ?? ($ficha['qid'] !== '' ? ($trailers[$ficha['qid']] ?? '') : ''),
+            'poster' => $poster,
+            'trailer' => $trailer,
             'enlace' => 'https://es.wikipedia.org/wiki/' . rawurlencode(str_replace(' ', '_', $ficha['titulo'])),
             'orden' => $ficha['orden'],
         ];
@@ -231,8 +229,20 @@ function buscar_en_wikipedia($texto)
         }
     }
 
-    /* Ordena cada grupo por la posición original en el search. */
-    $porRelevancia = function ($a, $b) {
+    /* Ordena cada grupo: primero los artículos del año que se buscó y luego
+          por la posición en el ranking de Wikipedia. Sirve para que
+          «nosferatu 2024» no devuelva la versión de 1979 (Wikipedia la rankea
+          arriba), sin romper búsquedas sin año, que no cambian de orden. */
+    $anosBuscados = [];
+    if (preg_match_all('/\b((?:19|20)\d{2})\b/', $texto, $encontrados)) {
+        $anosBuscados = $encontrados[1];
+    }
+    $porRelevancia = function ($a, $b) use ($anosBuscados) {
+        $aCoincide = in_array($a['anio'], $anosBuscados, true) ? 1 : 0;
+        $bCoincide = in_array($b['anio'], $anosBuscados, true) ? 1 : 0;
+        if ($aCoincide !== $bCoincide) {
+            return $bCoincide - $aCoincide;
+        }
         return $a['orden'] <=> $b['orden'];
     };
     usort($peliculas, $porRelevancia);
@@ -248,47 +258,82 @@ function buscar_en_wikipedia($texto)
     return array_slice($resultado, 0, 8);
 }
 
-/** Devuelve [qid => id_de_video_de_youtube] para los QIDs dados. */
-function trailer_de_wikidata($qids)
+/**
+ * Devuelve, para los QIDs dados, [qid => ['trailer' => id_youtube, 'poster' => url]].
+ *
+ * Es UNA sola petición: P1651 (tráiler) y P18 (imagen del filme) vienen juntas
+ * en 'claims'. El póster P18 apunta a Wikimedia Commons, que sí tiene imágenes
+ * libres; cuando está vacío (copyright) usamos la miniatura de Wikipedia.
+ */
+function datos_de_wikidata($qids, $conexion = null)
 {
     if (empty($qids)) {
         return [];
     }
-    $lote = implode('|', array_slice($qids, 0, 20));
+
+    /* 1) Lo que ya se pidió esta semana está en caché: no se repite. */
+    $fichas = [];
+    $faltan = [];
+    foreach ($qids as $qid) {
+        $guardado = leer_cache($conexion, 'entidad:' . $qid);
+        if ($guardado !== null) {
+            $fichas[$qid] = $guardado;
+        } else {
+            $faltan[] = $qid;
+        }
+    }
+    if (empty($faltan)) {
+        return $fichas;
+    }
+
+    /* 2) Una sola petición para las entidades que faltan. */
+    $lote = implode('|', array_slice($faltan, 0, 20));
     $datos = consultar_api(
         'https://www.wikidata.org/w/api.php?action=wbgetentities&format=json'
         . '&ids=' . $lote . '&props=claims'
     );
     if (!$datos || empty($datos['entities'])) {
-        return [];
+        return $fichas;
     }
 
-    $trailers = [];
     foreach ($datos['entities'] as $qid => $entidad) {
-        $reclamos = $entidad['claims']['P1651'] ?? [];
-        $preferido = '';
-        $cualquiera = '';
-        foreach ($reclamos as $reclamo) {
-            $valor = $reclamo['mainsnak']['datavalue']['value'] ?? '';
-            if (!is_string($valor) || $valor === '') {
-                continue;
-            }
-            if ($cualquiera === '') {
-                $cualquiera = $valor;
-            }
-            foreach (($reclamo['qualifiers']['P3831'] ?? []) as $cualificador) {
-                $tipo = $cualificador['mainsnak']['datavalue']['value']['id'] ?? '';
-                if ($tipo === 'Q622550') {
-                    $preferido = $valor;
+        $ficha = ['trailer' => '', 'poster' => ''];
+
+        if (is_array($entidad) && !isset($entidad['missing'])) {
+            /* --- Tráiler (P1651); preferimos el marcado como tráiler (P3831) --- */
+            $preferido = '';
+            $cualquiera = '';
+            foreach (($entidad['claims']['P1651'] ?? []) as $reclamo) {
+                $valor = $reclamo['mainsnak']['datavalue']['value'] ?? '';
+                if (!is_string($valor) || $valor === '') {
+                    continue;
+                }
+                if ($cualquiera === '') {
+                    $cualquiera = $valor;
+                }
+                foreach (($reclamo['qualifiers']['P3831'] ?? []) as $cualificador) {
+                    $tipo = $cualificador['mainsnak']['datavalue']['value']['id'] ?? '';
+                    if ($tipo === 'Q622550') {
+                        $preferido = $valor;
+                    }
                 }
             }
+            $ficha['trailer'] = $preferido !== '' ? $preferido : $cualquiera;
+
+            /* --- Imagen (P18): archivo alojado en Wikimedia Commons --- */
+            $archivo = $entidad['claims']['P18'][0]['mainsnak']['datavalue']['value'] ?? '';
+            if (is_string($archivo) && $archivo !== '') {
+                $ficha['poster'] = 'https://commons.wikimedia.org/wiki/Special:FilePath/'
+                    . rawurlencode(str_replace(' ', '_', $archivo)) . '?width=400';
+            }
         }
-        $trailer = $preferido !== '' ? $preferido : $cualquiera;
-        if ($trailer !== '') {
-            $trailers[$qid] = $trailer;
-        }
+
+        /* Se guarda también la entidad sin nada, para no volver a pedirla. */
+        guardar_cache($conexion, 'entidad:' . $qid, $ficha, 604800);
+        $fichas[$qid] = $ficha;
     }
-    return $trailers;
+
+    return $fichas;
 }
 
 /** Extrae el primer año (19xx/20xx) de un texto, o cadena vacía. */
